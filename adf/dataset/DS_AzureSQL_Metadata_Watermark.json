@@ -1,0 +1,40 @@
+{
+	"name": "DS_AzureSQL_Metadata_Watermark",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Metadata_Dev",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ConfigId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "InitialLoadCompleted",
+				"type": "bit"
+			},
+			{
+				"name": "LastSuccessfulWatermark",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "LastSuccessfulRunId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "LastSuccessAt",
+				"type": "datetime2",
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "ctl",
+			"table": "IngestionWatermark"
+		}
+	}
+}

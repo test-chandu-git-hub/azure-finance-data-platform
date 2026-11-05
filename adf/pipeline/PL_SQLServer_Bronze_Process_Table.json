@@ -1,0 +1,888 @@
+{
+	"name": "PL_SQLServer_Bronze_Process_Table",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_Get_Table_Config",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat('SELECT c.ConfigId, c.PipelineCode, c.SourceObject, c.LoadStrategy, c.TargetContainer, c.TargetBasePath, s.ServerName, s.DatabaseName, s.SchemaName, s.TableName, s.WatermarkColumn FROM ctl.IngestionConfig c INNER JOIN ctl.SqlServerSourceConfig s ON c.ConfigId = s.ConfigId WHERE c.IsActive = 1 AND c.ConfigId = ', string(pipeline().parameters.pConfigId))",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_IngestionConfig",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "LKP_Get_Watermark",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_Table_Config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat(\n  'SELECT ConfigId, InitialLoadCompleted, LastSuccessfulWatermark, LastSuccessfulRunId, LastSuccessAt FROM ctl.IngestionWatermark WHERE ConfigId = ',\n  string(pipeline().parameters.pConfigId)\n)",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_Watermark",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "IF_Check_InitialLoad",
+				"description": "IF_Check_InitialLoad",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_Watermark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('LKP_Get_Watermark').output.firstRow.InitialLoadCompleted, false)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "LKP_Get_Incremental_UpperWatermark",
+							"description": "LKP_Get_Incremental_UpperWatermark",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT MAX([',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,']) AS UpperWatermark FROM [',activity('LKP_Get_Table_Config').output.firstRow.SchemaName,'].[',activity('LKP_Get_Table_Config').output.firstRow.TableName,']')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": {
+											"value": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+											"type": "Expression"
+										},
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "CP_SQLServer_Incremental_To_Bronze",
+							"description": "CP_SQLServer_Incremental_To_Bronze",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "LKP_Get_Incremental_UpperWatermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT * FROM [',activity('LKP_Get_Table_Config').output.firstRow.SchemaName,'].[',activity('LKP_Get_Table_Config').output.firstRow.TableName,'] WHERE [',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,'] > ''',activity('LKP_Get_Watermark').output.firstRow.LastSuccessfulWatermark,''' AND [',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,'] <= ''',activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark,'''')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_Bronze_Parquet_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pContainerName": "@activity('LKP_Get_Table_Config').output.firstRow.TargetContainer",
+										"pFolderPath": "@concat(activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))"
+									}
+								}
+							]
+						},
+						{
+							"name": "SP_Log_Incremental_Success",
+							"description": "SP_Log_Incremental_Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SP_Update_Incremental_Watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "NULL",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "SUCCEEDED",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "INCREMENTAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RowsRead": {
+										"value": {
+											"value": "@activity('CP_SQLServer_Incremental_To_Bronze').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"RowsWritten": {
+										"value": {
+											"value": "@activity('CP_SQLServer_Incremental_To_Bronze').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"TargetPath": {
+										"value": {
+											"value": "@concat(activity('LKP_Get_Table_Config').output.firstRow.TargetContainer,'/',activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SP_Update_Incremental_Watermark",
+							"description": "SP_Update_Incremental_Watermark",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CP_SQLServer_Incremental_To_Bronze",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ctl].[usp_UpdateIngestionWatermark]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": "@pipeline().parameters.pConfigId",
+										"type": "Int32"
+									},
+									"NewWatermark": {
+										"value": "@activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark",
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SP_Log_Incremental_Copy_Failure",
+							"description": "SP_Log_Incremental_Copy_Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CP_SQLServer_Incremental_To_Bronze",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('CP_SQLServer_Incremental_To_Bronze').error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "FAILED",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "INCREMENTAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RowsRead": {
+										"value": "",
+										"type": "Int64"
+									},
+									"RowsWritten": {
+										"value": "",
+										"type": "Int64"
+									},
+									"TargetPath": {
+										"value": "",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "FAIL_Incremental_Copy",
+							"description": "INCREMENTAL_COPY_FAILED",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "SP_Log_Incremental_Copy_Failure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "@activity('CP_SQLServer_Incremental_To_Bronze').error.message",
+								"errorCode": "INCREMENTAL_COPY_FAILED"
+							}
+						},
+						{
+							"name": "SP_Log_Incremental_Watermark_Failure",
+							"description": "SP_Log_Incremental_Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SP_Update_Incremental_Watermark",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "@activity('SP_Update_Incremental_Watermark').error.message",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "FAILED",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "INCREMENTAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RowsRead": {
+										"type": "Int64"
+									},
+									"RowsWritten": {
+										"type": "Int64"
+									},
+									"TargetPath": {
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "FAIL_Incremental_Watermark",
+							"description": "INCREMENTAL_COPY_FAILED",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "SP_Log_Incremental_Watermark_Failure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@activity('SP_Update_Incremental_Watermark').error.message",
+									"type": "Expression"
+								},
+								"errorCode": "INCREMENTAL_WATERMARK_FAILED"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "LKP_Get_Source_UpperWatermark",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT MAX(', activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn, ') AS UpperWatermark FROM [', activity('LKP_Get_Table_Config').output.firstRow.SchemaName, '].[', activity('LKP_Get_Table_Config').output.firstRow.TableName, ']')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "CP_SQLServer_Initial_To_Bronze",
+							"description": "CP_SQLServer_Initial_To_Bronze",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "LKP_Get_Source_UpperWatermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat(\n  'SELECT * FROM [',\n  activity('LKP_Get_Table_Config').output.firstRow.SchemaName,\n  '].[',\n  activity('LKP_Get_Table_Config').output.firstRow.TableName,\n  '] WHERE [',\n  activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,\n  '] <= ''',\n  activity('LKP_Get_Source_UpperWatermark').output.firstRow.UpperWatermark,\n  ''''\n)",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_Bronze_Parquet_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pContainerName": "@activity('LKP_Get_Table_Config').output.firstRow.TargetContainer",
+										"pFolderPath": {
+											"value": "@concat(\n  activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,\n  '/ingestion_date=',\n  formatDateTime(utcNow(), 'yyyy-MM-dd')\n)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "SP_Update_Historical_Watermark",
+							"description": "SP_Update_Historical_Watermark",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CP_SQLServer_Initial_To_Bronze",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ctl].[usp_UpdateIngestionWatermark]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"NewWatermark": {
+										"value": {
+											"value": "@activity('LKP_Get_Source_UpperWatermark').output.firstRow.UpperWatermark",
+											"type": "Expression"
+										},
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SP_Log_Historical_Success",
+							"description": "SP_Log_Historical_Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SP_Update_Historical_Watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "NULL",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "SUCCEEDED",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"RowsRead": {
+										"value": {
+											"value": "@activity('CP_SQLServer_Initial_To_Bronze').output.rowsRead",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"RowsWritten": {
+										"value": {
+											"value": "@activity('CP_SQLServer_Initial_To_Bronze').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"TargetPath": {
+										"value": {
+											"value": "@concat(activity('LKP_Get_Table_Config').output.firstRow.TargetContainer,'/',activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SP_Log_Historical_Copy_Failure",
+							"description": "SP_Log_Historical_Copy_Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CP_SQLServer_Initial_To_Bronze",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": "@pipeline().parameters.pConfigId",
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "FAILED",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "FAIL_Historical_Copy",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "SP_Log_Historical_Copy_Failure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+								"errorCode": "HISTORICAL_COPY_FAILED"
+							}
+						},
+						{
+							"name": "SP_Log_Historical_Watermark_Failure",
+							"description": "SP_Log_Historical_Watermark_Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SP_Update_Historical_Watermark",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "@activity('SP_Update_Historical_Watermark').error.message",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "FAIL_Historical_Watermark",
+							"description": "FAIL_Historical_Watermark",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "SP_Log_Historical_Watermark_Failure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@activity('SP_Update_Historical_Watermark').error.message",
+									"type": "Expression"
+								},
+								"errorCode": "HISTORICAL_WATERMARK_FAILED"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"pConfigId": {
+				"type": "Int"
+			}
+		},
+		"annotations": []
+	}
+}
