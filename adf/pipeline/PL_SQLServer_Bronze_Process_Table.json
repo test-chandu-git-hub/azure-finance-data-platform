@@ -796,6 +796,62 @@
 								"message": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
 								"errorCode": "HISTORICAL_COPY_FAILED"
 							}
+						},
+						{
+							"name": "SP_Log_Historical_Watermark_Failure",
+							"description": "SP_Log_Historical_Watermark_Failure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SP_Update_Historical_Watermark",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": "@activity('SP_Update_Historical_Watermark').error.message",
+										"type": "String"
+									},
+									"ExecutionStatus": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"LoadType": {
+										"value": "HISTORICAL",
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
 						}
 					]
 				}
