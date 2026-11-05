@@ -47,95 +47,25 @@
 					"isSequential": true,
 					"activities": [
 						{
-							"name": "LKP_Get_Watermark",
-							"type": "Lookup",
+							"name": "EP_Process_SQLServer_Table",
+							"type": "ExecutePipeline",
 							"dependsOn": [],
 							"policy": {
-								"timeout": "0.12:00:00",
-								"retry": 0,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
 								"secureInput": false
 							},
 							"userProperties": [],
 							"typeProperties": {
-								"source": {
-									"type": "AzureSqlSource",
-									"sqlReaderQuery": "@concat(\n  'SELECT * FROM ctl.IngestionWatermark WHERE ConfigId = ',\n  string(activity('LKP_Get_IngestionConfig').output.firstRow.ConfigId)\n)",
-									"queryTimeout": "02:00:00",
-									"partitionOption": "None"
+								"pipeline": {
+									"referenceName": "PL_SQLServer_Bronze_Process_Table",
+									"type": "PipelineReference"
 								},
-								"dataset": {
-									"referenceName": "DS_AzureSQL_Metadata_Watermark",
-									"type": "DatasetReference"
-								},
-								"firstRowOnly": false
-							}
-						},
-						{
-							"name": "IF_Check_InitialLoad",
-							"type": "IfCondition",
-							"dependsOn": [
-								{
-									"activity": "LKP_Get_Watermark",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"userProperties": [],
-							"typeProperties": {
-								"expression": {
-									"value": "@equals(activity('LKP_Get_Watermark').output.firstRow.InitialLoadCompleted, false)",
-									"type": "Expression"
-								},
-								"ifTrueActivities": [
-									{
-										"name": "CP_SQLServer_Initial_To_Bronze",
-										"type": "Copy",
-										"dependsOn": [],
-										"policy": {
-											"timeout": "0.12:00:00",
-											"retry": 0,
-											"retryIntervalInSeconds": 30,
-											"secureOutput": false,
-											"secureInput": false
-										},
-										"userProperties": [],
-										"typeProperties": {
-											"source": {
-												"type": "SqlServerSource",
-												"queryTimeout": "02:00:00",
-												"partitionOption": "None"
-											},
-											"enableStaging": false
-										},
-										"inputs": [
-											{
-												"referenceName": "DS_SQLServer_Source_Generic",
-												"type": "DatasetReference",
-												"parameters": {
-													"pSchemaName": {
-														"value": "@item().SchemaName",
-														"type": "Expression"
-													},
-													"pTableName": {
-														"value": "@item().TableName",
-														"type": "Expression"
-													},
-													"pServerName": {
-														"value": "@item().ServerName",
-														"type": "Expression"
-													},
-													"pDatabaseName": {
-														"value": "@item().DatabaseName",
-														"type": "Expression"
-													}
-												}
-											}
-										]
+								"waitOnCompletion": true,
+								"parameters": {
+									"pConfigId": {
+										"value": "@item().ConfigId",
+										"type": "Expression"
 									}
-								]
+								}
 							}
 						}
 					]
