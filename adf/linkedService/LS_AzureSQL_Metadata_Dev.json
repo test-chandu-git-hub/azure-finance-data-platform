@@ -1,0 +1,24 @@
+{
+	"name": "LS_AzureSQL_Metadata_Dev",
+	"properties": {
+		"description": "Azure SQL Metadata and Audit Database",
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "sql-finance-metadata-dev.database.windows.net",
+			"database": "sqldb-finance-metadata-dev",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SQL",
+			"userName": "sqlmetadataadmin",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault_Dev",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "azuresql-metadata-password"
+			}
+		}
+	}
+}

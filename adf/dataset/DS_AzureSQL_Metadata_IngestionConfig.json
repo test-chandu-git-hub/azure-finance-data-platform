@@ -1,0 +1,61 @@
+{
+	"name": "DS_AzureSQL_Metadata_IngestionConfig",
+	"properties": {
+		"description": "DS_AzureSQL_Metadata_IngestionConfig",
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Metadata_Dev",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ConfigId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "PipelineCode",
+				"type": "varchar"
+			},
+			{
+				"name": "SourceSystem",
+				"type": "varchar"
+			},
+			{
+				"name": "SourceObject",
+				"type": "varchar"
+			},
+			{
+				"name": "LoadStrategy",
+				"type": "varchar"
+			},
+			{
+				"name": "TargetContainer",
+				"type": "varchar"
+			},
+			{
+				"name": "TargetBasePath",
+				"type": "varchar"
+			},
+			{
+				"name": "IsActive",
+				"type": "bit"
+			},
+			{
+				"name": "CreatedAt",
+				"type": "datetime2",
+				"scale": 3
+			},
+			{
+				"name": "UpdatedAt",
+				"type": "datetime2",
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "ctl",
+			"table": "IngestionConfig"
+		}
+	}
+}
