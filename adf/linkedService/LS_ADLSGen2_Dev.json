@@ -1,0 +1,11 @@
+{
+	"name": "LS_ADLSGen2_Dev",
+	"properties": {
+		"description": "Development ADLS Gen2 connection for Finance Data Platform using Managed Identity.",
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://stdevfinance1.dfs.core.windows.net/"
+		}
+	}
+}
