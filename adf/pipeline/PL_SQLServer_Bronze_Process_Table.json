@@ -1,0 +1,251 @@
+{
+	"name": "PL_SQLServer_Bronze_Process_Table",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_Get_Table_Config",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat('SELECT c.ConfigId, c.PipelineCode, c.SourceObject, c.LoadStrategy, c.TargetContainer, c.TargetBasePath, s.ServerName, s.DatabaseName, s.SchemaName, s.TableName, s.WatermarkColumn FROM ctl.IngestionConfig c INNER JOIN ctl.SqlServerSourceConfig s ON c.ConfigId = s.ConfigId WHERE c.IsActive = 1 AND c.ConfigId = ', string(pipeline().parameters.pConfigId))",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_IngestionConfig",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "LKP_Get_Watermark",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_Table_Config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat(\n  'SELECT ConfigId, InitialLoadCompleted, LastSuccessfulWatermark, LastSuccessfulRunId, LastSuccessAt FROM ctl.IngestionWatermark WHERE ConfigId = ',\n  string(pipeline().parameters.pConfigId)\n)",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_Watermark",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "IF_Check_InitialLoad",
+				"description": "IF_Check_InitialLoad",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_Watermark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('LKP_Get_Watermark').output.firstRow.InitialLoadCompleted, false)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "LKP_Get_Source_UpperWatermark",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT MAX(', activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn, ') AS UpperWatermark FROM [', activity('LKP_Get_Table_Config').output.firstRow.SchemaName, '].[', activity('LKP_Get_Table_Config').output.firstRow.TableName, ']')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "CP_SQLServer_Initial_To_Bronze",
+							"description": "CP_SQLServer_Initial_To_Bronze",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "LKP_Get_Source_UpperWatermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat(\n  'SELECT * FROM [',\n  activity('LKP_Get_Table_Config').output.firstRow.SchemaName,\n  '].[',\n  activity('LKP_Get_Table_Config').output.firstRow.TableName,\n  '] WHERE [',\n  activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,\n  '] <= ''',\n  activity('LKP_Get_Source_UpperWatermark').output.firstRow.UpperWatermark,\n  ''''\n)",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_Bronze_Parquet_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pContainerName": "@activity('LKP_Get_Table_Config').output.firstRow.TargetContainer",
+										"pFolderPath": {
+											"value": "@concat(\n  activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,\n  '/ingestion_date=',\n  formatDateTime(utcNow(), 'yyyy-MM-dd')\n)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "SP_Update_Historical_Watermark",
+							"description": "SP_Update_Historical_Watermark",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CP_SQLServer_Initial_To_Bronze",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[ctl].[usp_UpdateIngestionWatermark]",
+								"storedProcedureParameters": {
+									"ConfigId": {
+										"value": "@pipeline().parameters.pConfigId",
+										"type": "Int32"
+									},
+									"NewWatermark": {
+										"value": "@activity('LKP_Get_Source_UpperWatermark').output.firstRow.UpperWatermark",
+										"type": "DateTime"
+									},
+									"PipelineRunId": {
+										"value": "@pipeline().RunId",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "LS_AzureSQL_Metadata_Dev",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"pConfigId": {
+				"type": "Int"
+			}
+		},
+		"annotations": []
+	}
+}

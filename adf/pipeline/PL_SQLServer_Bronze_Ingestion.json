@@ -1,0 +1,147 @@
+{
+	"name": "PL_SQLServer_Bronze_Ingestion",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_Get_IngestionConfig",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT ConfigId, PipelineCode, SourceSystem, SourceObject, LoadStrategy, TargetContainer, TargetBasePath FROM ctl.IngestionConfig WHERE PipelineCode = 'PL_SQLServer_Bronze_Ingestion' AND IsActive = 1",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_IngestionConfig",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "FE_Process_Source_Tables",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_IngestionConfig",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LKP_Get_IngestionConfig').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "LKP_Get_Watermark",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": "@concat(\n  'SELECT * FROM ctl.IngestionWatermark WHERE ConfigId = ',\n  string(activity('LKP_Get_IngestionConfig').output.firstRow.ConfigId)\n)",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_AzureSQL_Metadata_Watermark",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": false
+							}
+						},
+						{
+							"name": "IF_Check_InitialLoad",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "LKP_Get_Watermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(activity('LKP_Get_Watermark').output.firstRow.InitialLoadCompleted, false)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "CP_SQLServer_Initial_To_Bronze",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "SqlServerSource",
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"enableStaging": false
+										},
+										"inputs": [
+											{
+												"referenceName": "DS_SQLServer_Source_Generic",
+												"type": "DatasetReference",
+												"parameters": {
+													"pSchemaName": {
+														"value": "@item().SchemaName",
+														"type": "Expression"
+													},
+													"pTableName": {
+														"value": "@item().TableName",
+														"type": "Expression"
+													},
+													"pServerName": {
+														"value": "@item().ServerName",
+														"type": "Expression"
+													},
+													"pDatabaseName": {
+														"value": "@item().DatabaseName",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"annotations": []
+	}
+}
