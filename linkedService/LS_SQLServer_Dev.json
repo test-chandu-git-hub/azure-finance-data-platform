@@ -1,0 +1,38 @@
+{
+	"name": "LS_SQLServer_Dev",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"parameters": {
+			"pServerName": {
+				"type": "String",
+				"defaultValue": "localhost"
+			},
+			"pDatabaseName": {
+				"type": "String",
+				"defaultValue": "financeDB"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServer",
+		"typeProperties": {
+			"server": "@{linkedService().pServerName}",
+			"database": "@{linkedService().pDatabaseName}",
+			"encrypt": "mandatory",
+			"trustServerCertificate": true,
+			"authenticationType": "SQL",
+			"userName": "adf_ingestion_user",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault_Dev",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "sqlserver-finance-password"
+			}
+		},
+		"connectVia": {
+			"referenceName": "IR-SHIR-Dev-LocalSQL",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

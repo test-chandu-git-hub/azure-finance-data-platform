@@ -1,0 +1,7 @@
+{
+	"name": "IR-SHIR-Dev-LocalSQL",
+	"properties": {
+		"type": "SelfHosted",
+		"description": "Self-hosted IR for local SQL Server ingestion"
+	}
+}

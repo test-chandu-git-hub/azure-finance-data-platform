@@ -1,0 +1,47 @@
+{
+	"name": "DS_SQLServer_Source_Generic",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SQLServer_Dev",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"pServerName": {
+					"value": "@dataset().pServerName",
+					"type": "Expression"
+				},
+				"pDatabaseName": {
+					"value": "@dataset().pDatabaseName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"pSchemaName": {
+				"type": "string"
+			},
+			"pTableName": {
+				"type": "string"
+			},
+			"pServerName": {
+				"type": "string"
+			},
+			"pDatabaseName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().pSchemaName",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().pTableName",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
