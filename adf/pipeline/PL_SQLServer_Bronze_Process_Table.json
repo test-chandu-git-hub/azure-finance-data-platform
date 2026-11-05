@@ -84,6 +84,116 @@
 						"value": "@equals(activity('LKP_Get_Watermark').output.firstRow.InitialLoadCompleted, false)",
 						"type": "Expression"
 					},
+					"ifFalseActivities": [
+						{
+							"name": "LKP_Get_Incremental_UpperWatermark",
+							"description": "LKP_Get_Incremental_UpperWatermark",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT MAX([',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,']) AS UpperWatermark FROM [',activity('LKP_Get_Table_Config').output.firstRow.SchemaName,'].[',activity('LKP_Get_Table_Config').output.firstRow.TableName,']')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": {
+											"value": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+											"type": "Expression"
+										},
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "CP_SQLServer_Incremental_To_Bronze",
+							"description": "CP_SQLServer_Incremental_To_Bronze",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "LKP_Get_Incremental_UpperWatermark",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": "@concat('SELECT * FROM [',activity('LKP_Get_Table_Config').output.firstRow.SchemaName,'].[',activity('LKP_Get_Table_Config').output.firstRow.TableName,'] WHERE [',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,'] > ''',activity('LKP_Get_Watermark').output.firstRow.LastSuccessfulWatermark,''' AND [',activity('LKP_Get_Table_Config').output.firstRow.WatermarkColumn,'] <= ''',activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark,'''')",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQLServer_Source_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pSchemaName": "@activity('LKP_Get_Table_Config').output.firstRow.SchemaName",
+										"pTableName": "@activity('LKP_Get_Table_Config').output.firstRow.TableName",
+										"pServerName": "@activity('LKP_Get_Table_Config').output.firstRow.ServerName",
+										"pDatabaseName": "@activity('LKP_Get_Table_Config').output.firstRow.DatabaseName"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_Bronze_Parquet_Generic",
+									"type": "DatasetReference",
+									"parameters": {
+										"pContainerName": "@activity('LKP_Get_Table_Config').output.firstRow.TargetContainer",
+										"pFolderPath": "@concat(activity('LKP_Get_Table_Config').output.firstRow.TargetBasePath,'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))"
+									}
+								}
+							]
+						}
+					],
 					"ifTrueActivities": [
 						{
 							"name": "LKP_Get_Source_UpperWatermark",
