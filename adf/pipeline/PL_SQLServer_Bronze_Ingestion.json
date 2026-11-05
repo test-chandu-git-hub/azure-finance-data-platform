@@ -1,0 +1,77 @@
+{
+	"name": "PL_SQLServer_Bronze_Ingestion",
+	"properties": {
+		"activities": [
+			{
+				"name": "LKP_Get_IngestionConfig",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT ConfigId, PipelineCode, SourceSystem, SourceObject, LoadStrategy, TargetContainer, TargetBasePath FROM ctl.IngestionConfig WHERE PipelineCode = 'PL_SQLServer_Bronze_Ingestion' AND IsActive = 1",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AzureSQL_Metadata_IngestionConfig",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "FE_Process_Source_Tables",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LKP_Get_IngestionConfig",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LKP_Get_IngestionConfig').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "EP_Process_SQLServer_Table",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL_SQLServer_Bronze_Process_Table",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"pConfigId": {
+										"value": "@item().ConfigId",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"annotations": []
+	}
+}
