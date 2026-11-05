@@ -852,6 +852,27 @@
 								"referenceName": "LS_AzureSQL_Metadata_Dev",
 								"type": "LinkedServiceReference"
 							}
+						},
+						{
+							"name": "FAIL_Historical_Watermark",
+							"description": "FAIL_Historical_Watermark",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "SP_Log_Historical_Watermark_Failure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@activity('SP_Update_Historical_Watermark').error.message",
+									"type": "Expression"
+								},
+								"errorCode": "HISTORICAL_WATERMARK_FAILED"
+							}
 						}
 					]
 				}
