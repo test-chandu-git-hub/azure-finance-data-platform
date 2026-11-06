@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-dev-finance12"
+		},
+		"LS_ADLSGen2_Dev_properties_typeProperties_url": {
+			"value": "https://stdevfinance1.dfs.core.windows.net/"
+		},
+		"LS_AzureSQL_Metadata_Dev_properties_typeProperties_server": {
+			"value": "sql-finance-metadata-dev.database.windows.net"
+		},
+		"LS_AzureSQL_Metadata_Dev_properties_typeProperties_database": {
+			"value": "sqldb-finance-metadata-dev"
+		},
+		"LS_AzureSQL_Metadata_Dev_properties_typeProperties_userName": {
+			"value": "sqlmetadataadmin"
+		},
+		"LS_KeyVault_Dev_properties_typeProperties_baseUrl": {
+			"value": "https://kvdevfinance1.vault.azure.net/"
+		},
+		"LS_SQLServer_Dev_properties_typeProperties_server": {
+			"value": "@{linkedService().pServerName}"
+		},
+		"LS_SQLServer_Dev_properties_typeProperties_database": {
+			"value": "@{linkedService().pDatabaseName}"
+		},
+		"LS_SQLServer_Dev_properties_typeProperties_userName": {
+			"value": "adf_ingestion_user"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
