@@ -372,7 +372,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "INCREMENTAL",
+												"value": "WATERMARK",
 												"type": "String"
 											},
 											"PipelineRunId": {
@@ -503,7 +503,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "INCREMENTAL",
+												"value": "WATERMARK",
 												"type": "String"
 											},
 											"PipelineRunId": {
@@ -595,7 +595,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "INCREMENTAL",
+												"value": "WATERMARK",
 												"type": "String"
 											},
 											"PipelineRunId": {
@@ -844,7 +844,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "HISTORICAL",
+												"value": "FULL",
 												"type": "String"
 											},
 											"PipelineRunId": {
@@ -924,7 +924,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "HISTORICAL",
+												"value": "FULL",
 												"type": "String"
 											},
 											"PipelineRunId": {
@@ -1003,7 +1003,7 @@
 												"type": "String"
 											},
 											"LoadType": {
-												"value": "HISTORICAL",
+												"value": "FULL",
 												"type": "String"
 											},
 											"PipelineRunId": {
