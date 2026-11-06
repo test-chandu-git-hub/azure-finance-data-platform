@@ -592,7 +592,7 @@
 												"type": "String"
 											},
 											"ExecutionStatus": {
-												"value": "SUCCEEDED",
+												"value": "SUCCESS",
 												"type": "String"
 											},
 											"LoadType": {
@@ -1064,7 +1064,7 @@
 												"type": "String"
 											},
 											"ExecutionStatus": {
-												"value": "SUCCEEDED",
+												"value": "SUCCESS",
 												"type": "String"
 											},
 											"LoadType": {
