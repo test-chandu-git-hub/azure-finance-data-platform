@@ -445,7 +445,7 @@
 													"value": "@activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark",
 													"type": "Expression"
 												},
-												"type": "DateTime"
+												"type": "String"
 											},
 											"PipelineRunId": {
 												"value": {
@@ -789,7 +789,7 @@
 													"value": "@activity('LKP_Get_Source_UpperWatermark').output.firstRow.UpperWatermark",
 													"type": "Expression"
 												},
-												"type": "DateTime"
+												"type": "String"
 											},
 											"PipelineRunId": {
 												"value": {
