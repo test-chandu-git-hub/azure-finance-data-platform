@@ -231,7 +231,7 @@
 										"type": "String"
 									},
 									"ExecutionStatus": {
-										"value": "SUCCEEDED",
+										"value": "SUCCESS",
 										"type": "String"
 									},
 									"LoadType": {
@@ -297,15 +297,24 @@
 								"storedProcedureName": "[ctl].[usp_UpdateIngestionWatermark]",
 								"storedProcedureParameters": {
 									"ConfigId": {
-										"value": "@pipeline().parameters.pConfigId",
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
 										"type": "Int32"
 									},
 									"NewWatermark": {
-										"value": "@activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark",
+										"value": {
+											"value": "@activity('LKP_Get_Incremental_UpperWatermark').output.firstRow.UpperWatermark",
+											"type": "Expression"
+										},
 										"type": "DateTime"
 									},
 									"PipelineRunId": {
-										"value": "@pipeline().RunId",
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
 										"type": "String"
 									}
 								}
@@ -400,7 +409,10 @@
 							],
 							"userProperties": [],
 							"typeProperties": {
-								"message": "@activity('CP_SQLServer_Incremental_To_Bronze').error.message",
+								"message": {
+									"value": "@activity('CP_SQLServer_Incremental_To_Bronze').error.message",
+									"type": "Expression"
+								},
 								"errorCode": "INCREMENTAL_COPY_FAILED"
 							}
 						},
@@ -435,7 +447,10 @@
 										"type": "Int32"
 									},
 									"ErrorMessage": {
-										"value": "@activity('SP_Update_Incremental_Watermark').error.message",
+										"value": {
+											"value": "@activity('SP_Update_Incremental_Watermark').error.message",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"ExecutionStatus": {
@@ -688,7 +703,7 @@
 										"type": "String"
 									},
 									"ExecutionStatus": {
-										"value": "SUCCEEDED",
+										"value": "SUCCESS",
 										"type": "String"
 									},
 									"LoadType": {
@@ -754,11 +769,17 @@
 								"storedProcedureName": "[audit].[usp_LogPipelineExecution]",
 								"storedProcedureParameters": {
 									"ConfigId": {
-										"value": "@pipeline().parameters.pConfigId",
+										"value": {
+											"value": "@pipeline().parameters.pConfigId",
+											"type": "Expression"
+										},
 										"type": "Int32"
 									},
 									"ErrorMessage": {
-										"value": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+										"value": {
+											"value": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"ExecutionStatus": {
@@ -770,7 +791,10 @@
 										"type": "String"
 									},
 									"PipelineRunId": {
-										"value": "@pipeline().RunId",
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
 										"type": "String"
 									}
 								}
@@ -793,7 +817,10 @@
 							],
 							"userProperties": [],
 							"typeProperties": {
-								"message": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+								"message": {
+									"value": "@activity('CP_SQLServer_Initial_To_Bronze').error.message",
+									"type": "Expression"
+								},
 								"errorCode": "HISTORICAL_COPY_FAILED"
 							}
 						},
@@ -828,7 +855,10 @@
 										"type": "Int32"
 									},
 									"ErrorMessage": {
-										"value": "@activity('SP_Update_Historical_Watermark').error.message",
+										"value": {
+											"value": "@activity('SP_Update_Historical_Watermark').error.message",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"ExecutionStatus": {
