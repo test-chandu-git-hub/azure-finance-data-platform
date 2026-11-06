@@ -1,0 +1,22 @@
+{
+	"name": "LS_SFTP_Finance_Dev",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "stdevfinance1.blob.core.windows.net",
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "stdevfinance1.sftpsalesuser",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "LS_KeyVault_Dev",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "sftpsalesuserpwd"
+			}
+		}
+	}
+}
