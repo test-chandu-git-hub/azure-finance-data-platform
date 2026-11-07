@@ -9,9 +9,6 @@
 				"pipelineReference": {
 					"referenceName": "PL-SFTP-BronzeIngestion",
 					"type": "PipelineReference"
-				},
-				"parameters": {
-					"pSourceFolder": "sales/incoming"
 				}
 			}
 		],
