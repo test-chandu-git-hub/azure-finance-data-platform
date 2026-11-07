@@ -99,6 +99,73 @@
 								"type": "BinaryReadSettings"
 							}
 						}
+					},
+					{
+						"name": "FLT_CSV_Files",
+						"description": "FLT_CSV_Files",
+						"type": "Filter",
+						"dependsOn": [
+							{
+								"activity": "GM_List_SFTP_Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GM_List_SFTP_Files').output.childItems",
+								"type": "Expression"
+							},
+							"condition": {
+								"value": "@and(equals(item().type,'File'),endsWith(toLower(item().name),'.csv'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "FE_Process_SFTP_Files",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "FLT_CSV_Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('FLT_CSV_Files').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "EP_Invoke_SFTP_CopyToBronze",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"policy": {
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PL-SFTP-CopyFile-ToBronze",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"pSourceFolder": "@pipeline().parameters.pSourceFolder",
+											"pFileName": "@item().name",
+											"pTargetFolder": "@concat('sftp/',first(split(pipeline().parameters.pSourceFolder,'/')),'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))"
+										}
+									}
+								}
+							]
+						}
 					}
 				],
 				"policy": {
@@ -113,7 +180,8 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_SFTP_Source_Binary')]"
+				"[concat(variables('factoryId'), '/datasets/DS_SFTP_Source_Binary')]",
+				"[concat(variables('factoryId'), '/pipelines/PL-SFTP-CopyFile-ToBronze')]"
 			]
 		},
 		{
@@ -1623,6 +1691,348 @@
 				"typeProperties": {}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_AzureSQL_Metadata_SftpFileTracking')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_AzureSQL_Metadata_Dev",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "FileId",
+						"type": "bigint",
+						"precision": 19
+					},
+					{
+						"name": "SourceFolder",
+						"type": "nvarchar"
+					},
+					{
+						"name": "FileName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "FileSize",
+						"type": "bigint",
+						"precision": 19
+					},
+					{
+						"name": "SourceLastModified",
+						"type": "datetime2",
+						"scale": 3
+					},
+					{
+						"name": "TargetPath",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Status",
+						"type": "varchar"
+					},
+					{
+						"name": "PipelineRunId",
+						"type": "nvarchar"
+					},
+					{
+						"name": "CreatedAt",
+						"type": "datetime2",
+						"scale": 3
+					},
+					{
+						"name": "CompletedAt",
+						"type": "datetime2",
+						"scale": 3
+					}
+				],
+				"typeProperties": {
+					"schema": "ctl",
+					"table": "SftpFileTracking"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Metadata_Dev')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL-SFTP-CopyFile-ToBronze')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Reusable SFTP to ADLS Bronze copy with atomic SQL file claim and status tracking",
+				"activities": [
+					{
+						"name": "LKP_Claim_SFTP_File",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "@concat('EXEC ctl.usp_ClaimSftpFile @SourceFolder=N''',replace(pipeline().parameters.pSourceFolder,'''',''''''),''', @FileName=N''',replace(pipeline().parameters.pFileName,'''',''''''),''', @PipelineRunId=N''',pipeline().RunId,'''')",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AzureSQL_Metadata_SftpFileTracking",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "IF_Claim_Acquired",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "LKP_Claim_SFTP_File",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(int(activity('LKP_Claim_SFTP_File').output.firstRow.Claimed),1)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "CP_SFTP_To_Bronze_copy",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 60,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "BinarySource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": false,
+												"deleteFilesAfterCompletion": false
+											},
+											"formatSettings": {
+												"type": "BinaryReadSettings"
+											}
+										},
+										"sink": {
+											"type": "BinarySink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_SFTP_Source_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"pFolderPath": {
+													"value": "@pipeline().parameters.pSourceFolder",
+													"type": "Expression"
+												},
+												"pFileName": {
+													"value": "@pipeline().parameters.pFileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_ADLS_Bronze_Binary",
+											"type": "DatasetReference",
+											"parameters": {
+												"pFolderPath": {
+													"value": "@pipeline().parameters.pTargetFolder",
+													"type": "Expression"
+												},
+												"pFileName": {
+													"value": "@pipeline().parameters.pFileName",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "SP_Mark_SFTP_Success",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "CP_SFTP_To_Bronze_copy",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[ctl].[usp_CompleteSftpFile]",
+										"storedProcedureParameters": {
+											"FileId": {
+												"value": {
+													"value": "@activity('LKP_Claim_SFTP_File').output.firstRow.FileId",
+													"type": "Expression"
+												},
+												"type": "Int64"
+											},
+											"PipelineRunId": {
+												"value": {
+													"value": "@pipeline().RunId",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Status": {
+												"value": "SUCCESS",
+												"type": "String"
+											},
+											"TargetPath": {
+												"value": {
+													"value": "@concat('bronze/',pipeline().parameters.pTargetFolder,'/',pipeline().parameters.pFileName)",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "LS_AzureSQL_Metadata_Dev",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "SP_Mark_SFTP_Failed",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "CP_SFTP_To_Bronze_copy",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[ctl].[usp_CompleteSftpFile]",
+										"storedProcedureParameters": {
+											"FileId": {
+												"value": {
+													"value": "@activity('LKP_Claim_SFTP_File').output.firstRow.FileId",
+													"type": "Expression"
+												},
+												"type": "Int64"
+											},
+											"PipelineRunId": {
+												"value": {
+													"value": "@pipeline().RunId",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Status": {
+												"value": "FAILED",
+												"type": "String"
+											},
+											"TargetPath": {
+												"value": {
+													"value": "@concat('bronze/',pipeline().parameters.pTargetFolder,'/',pipeline().parameters.pFileName)",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "LS_AzureSQL_Metadata_Dev",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "FAIL_SFTP_Copy",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "SP_Mark_SFTP_Failed",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": {
+											"value": "@concat('Copy failed for file: ',pipeline().parameters.pFileName)",
+											"type": "Expression"
+										},
+										"errorCode": "SFTP_COPY_FAILED"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"pSourceFolder": {
+						"type": "String"
+					},
+					"pFileName": {
+						"type": "String"
+					},
+					"pTargetFolder": {
+						"type": "String"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AzureSQL_Metadata_SftpFileTracking')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SFTP_Source_Binary')]",
+				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Bronze_Binary')]",
+				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Metadata_Dev')]"
+			]
 		}
 	]
 }
