@@ -15,6 +15,10 @@
 			"type": "string",
 			"defaultValue": "https://kvdevfinance1.vault.azure.net/"
 		},
+		"TRG_SFTP_FileArrival_properties_typeProperties_scope": {
+			"type": "string",
+			"defaultValue": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1"
+		},
 		"LS_AzureSQL_Metadata_Dev_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "sql-finance-metadata-dev.database.windows.net"
@@ -46,10 +50,6 @@
 		"LS_SQLServer_Dev_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "adf_ingestion_user"
-		},
-		"TRG_SFTP_FileArrival_properties_typeProperties_scope": {
-			"type": "string",
-			"defaultValue": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1"
 		}
 	},
 	"variables": {
@@ -79,6 +79,28 @@
 				"type": "AzureKeyVault",
 				"typeProperties": {
 					"baseUrl": "[parameters('LS_KeyVault_Dev_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TRG_SFTP_FileArrival')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "TRG_SFTP_FileArrival",
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [],
+				"type": "BlobEventsTrigger",
+				"typeProperties": {
+					"blobPathBeginsWith": "/landing/blobs/",
+					"blobPathEndsWith": ".csv",
+					"ignoreEmptyBlobs": true,
+					"scope": "[parameters('TRG_SFTP_FileArrival_properties_typeProperties_scope')]",
+					"events": [
+						"Microsoft.Storage.BlobCreated"
+					]
 				}
 			},
 			"dependsOn": []
@@ -387,73 +409,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_SFTP_Sales_CSV')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "LS_SFTP_Finance_Dev",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"pFileName": {
-						"type": "string"
-					},
-					"pFolderPath": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "DelimitedText",
-				"typeProperties": {
-					"location": {
-						"type": "SftpLocation",
-						"fileName": {
-							"value": "@dataset().pFileName",
-							"type": "Expression"
-						},
-						"folderPath": {
-							"value": "@dataset().pFolderPath",
-							"type": "Expression"
-						}
-					},
-					"columnDelimiter": ",",
-					"escapeChar": "\\",
-					"firstRowAsHeader": true,
-					"quoteChar": "\""
-				},
-				"schema": [
-					{
-						"name": "sale_id",
-						"type": "String"
-					},
-					{
-						"name": "customer_id",
-						"type": "String"
-					},
-					{
-						"name": "product_id",
-						"type": "String"
-					},
-					{
-						"name": "quantity",
-						"type": "String"
-					},
-					{
-						"name": "unit_price",
-						"type": "String"
-					},
-					{
-						"name": "sale_date",
-						"type": "String"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/LS_SFTP_Finance_Dev')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/DS_SQLServer_Source_Generic')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -502,61 +457,6 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/LS_SQLServer_Dev')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL-SFTP-BronzeIngestion')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "PL_SFTP_Bronze_Ingestion",
-				"activities": [
-					{
-						"name": "GM_List_SFTP_Files",
-						"type": "GetMetadata",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_SFTP_Sales_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"pFileName": {
-										"value": "@string('')",
-										"type": "Expression"
-									},
-									"pFolderPath": "sales/incoming"
-								}
-							},
-							"fieldList": [
-								"childItems"
-							],
-							"storeSettings": {
-								"type": "SftpReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false,
-								"disableChunking": false
-							},
-							"formatSettings": {
-								"type": "DelimitedTextReadSettings"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_SFTP_Sales_CSV')]"
 			]
 		},
 		{
@@ -1576,38 +1476,6 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_AzureSQL_Metadata_IngestionConfig')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_SQLServer_Bronze_Process_Table')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/TRG_SFTP_FileArrival')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "TRG_SFTP_FileArrival",
-				"annotations": [],
-				"runtimeState": "Stopped",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL-SFTP-BronzeIngestion",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "BlobEventsTrigger",
-				"typeProperties": {
-					"blobPathBeginsWith": "/landing/blobs/",
-					"blobPathEndsWith": ".csv",
-					"ignoreEmptyBlobs": true,
-					"scope": "[parameters('TRG_SFTP_FileArrival_properties_typeProperties_scope')]",
-					"events": [
-						"Microsoft.Storage.BlobCreated"
-					]
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL-SFTP-BronzeIngestion')]"
 			]
 		}
 	]
