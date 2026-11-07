@@ -46,6 +46,10 @@
 		"LS_SQLServer_Dev_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "adf_ingestion_user"
+		},
+		"TRG_SFTP_FileArrival_properties_typeProperties_scope": {
+			"type": "string",
+			"defaultValue": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1"
 		}
 	},
 	"variables": {
@@ -1566,6 +1570,38 @@
 				"typeProperties": {}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TRG_SFTP_FileArrival')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "TRG_SFTP_FileArrival",
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL-SFTP-BronzeIngestion",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "BlobEventsTrigger",
+				"typeProperties": {
+					"blobPathBeginsWith": "/landing/blobs/",
+					"blobPathEndsWith": ".csv",
+					"ignoreEmptyBlobs": true,
+					"scope": "[parameters('TRG_SFTP_FileArrival_properties_typeProperties_scope')]",
+					"events": [
+						"Microsoft.Storage.BlobCreated"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL-SFTP-BronzeIngestion')]"
+			]
 		}
 	]
 }
