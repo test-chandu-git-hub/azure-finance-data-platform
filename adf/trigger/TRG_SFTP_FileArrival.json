@@ -1,0 +1,26 @@
+{
+	"name": "TRG_SFTP_FileArrival",
+	"properties": {
+		"description": "TRG_SFTP_FileArrival",
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "PL-SFTP-BronzeIngestion",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "BlobEventsTrigger",
+		"typeProperties": {
+			"blobPathBeginsWith": "/landing/blobs/",
+			"blobPathEndsWith": ".csv",
+			"ignoreEmptyBlobs": true,
+			"scope": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1",
+			"events": [
+				"Microsoft.Storage.BlobCreated"
+			]
+		}
+	}
+}
