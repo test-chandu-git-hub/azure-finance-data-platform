@@ -20,6 +20,12 @@
 		"LS_KeyVault_Dev_properties_typeProperties_baseUrl": {
 			"value": "https://kvdevfinance1.vault.azure.net/"
 		},
+		"LS_SFTP_Finance_Dev_properties_typeProperties_host": {
+			"value": "stdevfinance1.blob.core.windows.net"
+		},
+		"LS_SFTP_Finance_Dev_properties_typeProperties_userName": {
+			"value": "stdevfinance1.sftpsalesuser"
+		},
 		"LS_SQLServer_Dev_properties_typeProperties_server": {
 			"value": "@{linkedService().pServerName}"
 		},
