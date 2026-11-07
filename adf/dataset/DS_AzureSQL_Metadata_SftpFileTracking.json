@@ -1,0 +1,62 @@
+{
+	"name": "DS_AzureSQL_Metadata_SftpFileTracking",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_AzureSQL_Metadata_Dev",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "FileId",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "SourceFolder",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FileName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FileSize",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "SourceLastModified",
+				"type": "datetime2",
+				"scale": 3
+			},
+			{
+				"name": "TargetPath",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Status",
+				"type": "varchar"
+			},
+			{
+				"name": "PipelineRunId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "CreatedAt",
+				"type": "datetime2",
+				"scale": 3
+			},
+			{
+				"name": "CompletedAt",
+				"type": "datetime2",
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "ctl",
+			"table": "SftpFileTracking"
+		}
+	}
+}

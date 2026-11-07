@@ -39,6 +39,73 @@
 						"type": "BinaryReadSettings"
 					}
 				}
+			},
+			{
+				"name": "FLT_CSV_Files",
+				"description": "FLT_CSV_Files",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "GM_List_SFTP_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GM_List_SFTP_Files').output.childItems",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@and(equals(item().type,'File'),endsWith(toLower(item().name),'.csv'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "FE_Process_SFTP_Files",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FLT_CSV_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('FLT_CSV_Files').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "EP_Invoke_SFTP_CopyToBronze",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "PL-SFTP-CopyFile-ToBronze",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"pSourceFolder": "@pipeline().parameters.pSourceFolder",
+									"pFileName": "@item().name",
+									"pTargetFolder": "@concat('sftp/',first(split(pipeline().parameters.pSourceFolder,'/')),'/ingestion_date=',formatDateTime(utcNow(),'yyyy-MM-dd'))"
+								}
+							}
+						}
+					]
+				}
 			}
 		],
 		"parameters": {
