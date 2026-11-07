@@ -8,6 +8,9 @@
 		"parameters": {
 			"pFileName": {
 				"type": "string"
+			},
+			"pFolderPath": {
+				"type": "string"
 			}
 		},
 		"annotations": [],
@@ -19,7 +22,10 @@
 					"value": "@dataset().pFileName",
 					"type": "Expression"
 				},
-				"folderPath": "/sales/incoming"
+				"folderPath": {
+					"value": "@dataset().pFolderPath",
+					"type": "Expression"
+				}
 			},
 			"columnDelimiter": ",",
 			"escapeChar": "\\",

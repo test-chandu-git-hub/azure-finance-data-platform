@@ -23,7 +23,8 @@
 							"pFileName": {
 								"value": "@string('')",
 								"type": "Expression"
-							}
+							},
+							"pFolderPath": "sales/incoming"
 						}
 					},
 					"fieldList": [
@@ -31,6 +32,7 @@
 					],
 					"storeSettings": {
 						"type": "SftpReadSettings",
+						"recursive": true,
 						"enablePartitionDiscovery": false,
 						"disableChunking": false
 					},
