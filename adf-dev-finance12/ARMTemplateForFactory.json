@@ -50,6 +50,10 @@
 		"TRG_SFTP_FileArrival_properties_typeProperties_scope": {
 			"type": "string",
 			"defaultValue": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1"
+		},
+		"SftpSalesTrigger_properties_PL-SFTP-BronzeIngestion_parameters_pSourceFolder": {
+			"type": "string",
+			"defaultValue": "sales/incoming"
 		}
 	},
 	"variables": {
@@ -2032,6 +2036,40 @@
 				"[concat(variables('factoryId'), '/datasets/DS_SFTP_Source_Binary')]",
 				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Bronze_Binary')]",
 				"[concat(variables('factoryId'), '/linkedServices/LS_AzureSQL_Metadata_Dev')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SftpSalesTrigger')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "SftpSalesTrigger",
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL-SFTP-BronzeIngestion",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"pSourceFolder": "[parameters('SftpSalesTrigger_properties_PL-SFTP-BronzeIngestion_parameters_pSourceFolder')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-11-07T14:30:00",
+						"timeZone": "India Standard Time",
+						"schedule": {}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL-SFTP-BronzeIngestion')]"
 			]
 		}
 	]

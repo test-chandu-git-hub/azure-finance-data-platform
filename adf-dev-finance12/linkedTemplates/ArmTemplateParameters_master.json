@@ -38,6 +38,9 @@
 		"TRG_SFTP_FileArrival_properties_typeProperties_scope": {
 			"value": "/subscriptions/9b165aad-26d0-4a47-93fd-f17ab3fd0817/resourceGroups/rg-dev-finance/providers/Microsoft.Storage/storageAccounts/stdevfinance1"
 		},
+		"SftpSalesTrigger_properties_PL-SFTP-BronzeIngestion_parameters_pSourceFolder": {
+			"value": "sales/incoming"
+		},
 		"containerUri": {
 			"value": ""
 		},
