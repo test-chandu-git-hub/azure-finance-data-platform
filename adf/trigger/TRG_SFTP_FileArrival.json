@@ -4,7 +4,17 @@
 		"description": "TRG_SFTP_FileArrival",
 		"annotations": [],
 		"runtimeState": "Stopped",
-		"pipelines": [],
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "PL-SFTP-BronzeIngestion",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"pSourceFolder": "sales/incoming"
+				}
+			}
+		],
 		"type": "BlobEventsTrigger",
 		"typeProperties": {
 			"blobPathBeginsWith": "/landing/blobs/",

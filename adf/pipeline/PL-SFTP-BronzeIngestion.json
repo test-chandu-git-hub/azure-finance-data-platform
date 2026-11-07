@@ -1,0 +1,52 @@
+{
+	"name": "PL-SFTP-BronzeIngestion",
+	"properties": {
+		"description": "Metadata-driven SFTP to ADLS Gen2 Bronze ingestion",
+		"activities": [
+			{
+				"name": "GM_List_SFTP_Files",
+				"description": "GM_List_SFTP_Files",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_SFTP_Source_Binary",
+						"type": "DatasetReference",
+						"parameters": {
+							"pFolderPath": {
+								"value": "@pipeline().parameters.pSourceFolder",
+								"type": "Expression"
+							},
+							"pFileName": "string('')"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "SftpReadSettings",
+						"recursive": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"pSourceFolder": {
+				"type": "String",
+				"defaultValue": "sales/incoming"
+			}
+		},
+		"annotations": []
+	}
+}

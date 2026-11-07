@@ -1,0 +1,33 @@
+{
+	"name": "DS_SFTP_Source_Binary",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SFTP_Finance_Dev",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"pFolderPath": {
+				"type": "string",
+				"defaultValue": "sales/incoming"
+			},
+			"pFileName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "SftpLocation",
+				"fileName": {
+					"value": "@dataset().pFileName",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().pFolderPath",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}
