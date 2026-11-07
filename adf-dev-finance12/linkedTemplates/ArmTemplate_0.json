@@ -542,7 +542,7 @@
 										"value": "@pipeline().parameters.pSourceFolder",
 										"type": "Expression"
 									},
-									"pFileName": "string('')"
+									"pFileName": "@string('')"
 								}
 							},
 							"fieldList": [
