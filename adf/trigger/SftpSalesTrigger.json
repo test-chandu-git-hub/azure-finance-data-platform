@@ -1,0 +1,28 @@
+{
+	"name": "SftpSalesTrigger",
+	"properties": {
+		"description": "SftpSalesTrigger",
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "PL-SFTP-BronzeIngestion",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"pSourceFolder": "sales/incoming"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 1,
+				"startTime": "2026-11-07T14:30:00",
+				"timeZone": "India Standard Time"
+			}
+		}
+	}
+}
