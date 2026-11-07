@@ -83,7 +83,8 @@
 									"pFileName": {
 										"value": "@string('')",
 										"type": "Expression"
-									}
+									},
+									"pFolderPath": "sales/incoming"
 								}
 							},
 							"fieldList": [
@@ -1334,6 +1335,9 @@
 				"parameters": {
 					"pFileName": {
 						"type": "string"
+					},
+					"pFolderPath": {
+						"type": "string"
 					}
 				},
 				"annotations": [],
@@ -1345,7 +1349,10 @@
 							"value": "@dataset().pFileName",
 							"type": "Expression"
 						},
-						"folderPath": "/sales/incoming"
+						"folderPath": {
+							"value": "@dataset().pFolderPath",
+							"type": "Expression"
+						}
 					},
 					"columnDelimiter": ",",
 					"escapeChar": "\\",
@@ -1561,17 +1568,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/IR-SHIR-Dev-LocalSQL')]",
-			"type": "Microsoft.DataFactory/factories/integrationRuntimes",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"type": "SelfHosted",
-				"description": "Self-hosted IR for local SQL Server ingestion",
-				"typeProperties": {}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/TRG_SFTP_FileArrival')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -1602,6 +1598,17 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL-SFTP-BronzeIngestion')]"
 			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/IR-SHIR-Dev-LocalSQL')]",
+			"type": "Microsoft.DataFactory/factories/integrationRuntimes",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "SelfHosted",
+				"description": "Self-hosted IR for local SQL Server ingestion",
+				"typeProperties": {}
+			},
+			"dependsOn": []
 		}
 	]
 }
